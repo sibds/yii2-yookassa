@@ -1,0 +1,28 @@
+{
+	"name": "sibds/yii2-yookassa",
+	"description": "Payment widget for yookassa ",
+	"type": "yii2-extension",
+	"keywords": [
+		"yii2",
+		" payment",
+		" sberbank",
+		" sibds",
+		" mazurva"
+	],
+	"license": "BSD-3-Clause",
+	"authors": [
+		{
+			"name": "Vadim Mazur",
+			"email": "mazurva@gmail.com"
+		}
+	],
+	"require": {
+		"yiisoft/yii2": "~2.0.0",
+		"dicr/yii2-yookassa": "^1.0"
+	},
+	"autoload": {
+		"psr-4": {
+			"sibds\\payment\\yookassa\\": ""
+		}
+	}
+}
