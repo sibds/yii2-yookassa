@@ -1,6 +1,6 @@
 # Yii2 Yookassa
 
-Payment widget for Yookassa
+Payment widget for Yookassa ([dvizh/yii2-order](https://github.com/dvizh/yii2-order))
 
 ## Installation
 
