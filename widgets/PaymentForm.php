@@ -32,29 +32,70 @@ class PaymentForm extends Widget
 
         $id = is_null($module->getId) ? $this->orderModel->getId() : (is_callable($module->getId) ? call_user_func($module->getId, [$this->orderModel]) : $module->getId);
 
-        $payment = $client->createPayment(
-            array(
-                'amount' => array(
-                    'value' => $this->orderModel->getCost(),
-                    'currency' => 'RUB',
-                ),
-                'confirmation' => array(
-                    'type' => 'redirect',
-                    'return_url' => Url::toRoute(['/yookassa/yookassa/result', 'order' => urlencode($id)], true)
-                ),
-                'receipt' => array(
-                    'customer' => array(
-                        'email' => $this->orderModel->email
-                    ),
-                    'items' => $this->cart,
-                ),
-                'capture' => false,
-                'description' => 'Заказ №' . $id,
-                'metadata' => array(
-                    'order_id' => (string)$id,
-                )
+        $data = array(
+            'amount' => array(
+                'value' => $this->orderModel->getCost(),
+                'currency' => 'RUB',
             ),
-            uniqid('', true)
+            'confirmation' => array(
+                'type' => 'redirect',
+                'return_url' => Url::toRoute(['/yookassa/yookassa/result', 'order' => urlencode($id)], true)
+            ),
+            'capture' => true,
+            'description' => 'Заказ №' . $id,
+            'metadata' => array(
+                'order_id' => (string)$id,
+            )
+        );
+
+        if ($module->supportCart) {
+            if ($this->cart) {
+                $data = array_merge(
+                    $data,
+                    [
+                        'receipt' => array(
+                            'customer' => array(
+                                'email' => $this->orderModel->email
+                            ),
+                            'items' => $this->cart,
+                            'tax_system_code' => $module->taxSystem,
+                        ),
+                    ]
+                );
+            } elseif (!is_null($module->defaulProductName)) {
+                $data = array_merge(
+                    $data,
+                    [
+                        'receipt' => array(
+                            'customer' => array(
+                                'email' => $this->orderModel->email
+                            ),
+                            'items' =>
+                            array(
+                                array(
+                                    'description' => $module->defaulProductName,
+                                    'quantity' => 1.000,
+                                    'amount' => array(
+                                        'value' => $this->orderModel->getCost(),
+                                        'currency' => 'RUB',
+                                    ),
+                                    'vat_code' => $module->vatCode,
+                                    'payment_mode' => $module->paymentMode,
+                                    'payment_subject' => $module->paymentSubject,
+                                ),
+                            ),
+                            'tax_system_code' => $module->taxSystem,
+                        ),
+                    ]
+                );
+            }
+        }
+
+        $idempotenceKey = uniqid('', true);
+
+        $payment = $client->createPayment(
+            $data,
+            $idempotenceKey
         );
 
         if ($payment->getStatus() == 'pending') {
@@ -66,6 +107,23 @@ class PaymentForm extends Widget
                 return $payment->confirmation->confirmationUrl;
             }
             header('Location: ' . $payment->confirmation->confirmationUrl);
+            die();
+        } elseif ($payment->getStatus() == 'succeeded ') {
+            $this->orderModel->setPaymentStatus('yes');
+
+            $this->orderModel->order_info = $payment->id;
+            $this->orderModel->save();
+            if (!$this->autoSend) {
+                return $payment->confirmation->confirmationUrl;
+            }
+            header('Location: ' . $payment->confirmation->confirmationUrl);
+            die();
+        } else {
+            if (!$this->autoSend) {
+                return Url::toRoute([$module->failUrl], true);
+            }
+            header('Location: ' . Url::toRoute([$module->failUrl], true));
+            //echo 'Ошибка #' . $response['errorCode'] . ': ' . $response['errorMessage'];
             die();
         }
         /*
@@ -139,7 +197,7 @@ class PaymentForm extends Widget
          *        5            Ошибка значения параметра запроса.
          *        7            Системная ошибка.
          */
-        $response = $module->gateway('register.do', $data);
+        //$response = $module->gateway('register.do', $data);
 
         //var_dump($response);
         //die();

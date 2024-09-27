@@ -21,7 +21,7 @@ class YookassaController extends \yii\web\Controller
 
     function actionResult($order = null, $orderId = null)
     {
-        $module = Yii::$app->getComponents();
+        $module = $this->module;
 
         if (is_null($orderId)) {
             $source = file_get_contents('php://input');
@@ -31,14 +31,14 @@ class YookassaController extends \yii\web\Controller
                 try {
                     if ($requestBody['event'] === NotificationEventType::PAYMENT_SUCCEEDED) {
                         $notification = new NotificationSucceeded($requestBody);
-                        $payment = $notification->getObject();
+                        $payment = $notification->getObject()->toArray(); // \YooKassa\Model\Payment\PaymentInterface
 
-                        $orderId = $payment->getId();
+                        $orderId = $payment['metadata']['order_id'];
                     }
 
                     if (is_null($orderId)) {
                         if (isset($requestBody['type']) && $requestBody['type'] == 'notification' && $requestBody['event'] == 'payment.succeeded') {
-                            $orderId = $requestBody['object']['id'];
+                            $orderId = $requestBody['object']['metadata']['order_id'];
                         }
                     }
                 } catch (Exception $e) {
@@ -52,11 +52,29 @@ class YookassaController extends \yii\web\Controller
 
         /** @var dicr\yookassa\Client $client */
         $client = $yooKassa->client;
+        if (!is_null($order)) {
+            $orderInfo = (new \yii\db\Query())
+                ->select(['o.order_info'])
+                ->from(['o' => 'order'])
+                ->innerJoin(['oe' => 'order_element'], 'o.id = oe.order_id')
+                ->innerJoin(['cs' => 'ct_sales'], 'oe.item_id = cs.id')
+                ->where(['cs.idorder' => $order])
+                ->scalar();
+        } else {
+            $orderInfo = (new \yii\db\Query())
+                ->select(['o.order_info'])
+                ->from(['o' => 'order'])
+                ->innerJoin(['oe' => 'order_element'], 'o.id = oe.order_id')
+                ->innerJoin(['cs' => 'ct_sales'], 'oe.item_id = cs.id')
+                ->where(['cs.idorder' => $orderId])
+                ->scalar();
+        }
 
         try {
-            $response = $client->getPaymentInfo($orderId);
+            $response = $client->getPaymentInfo($orderInfo)->toArray();
         } catch (\Exception $e) {
             $response = $e;
+            return $this->redirect($module->failUrl);
         }
 
         if (isset($response['status']) && $response['status'] == 'succeeded') {

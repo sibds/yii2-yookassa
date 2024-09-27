@@ -22,8 +22,14 @@ class Module extends \yii\base\Module
     public $sessionTimeout = null; // in seconds
     public $refundRate = 100; // percentage of refund
     public $logCategory = false;
-    public $supportCart = false;
+
     public $taxSystem = 1;
+    public $vatCode = 1;
+
+    public $supportCart = false;
+    public $defaulProductName = null;
+    public $paymentMode = 'full_payment';
+    public $paymentSubject = 'commodity';
 
     public function init()
     {
